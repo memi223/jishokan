@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Japanese Reading Helper (dev)",
+  "version": "0.0.1",
+  "description": "Highlight Japanese text on any page to see a lookup card. Dev slice: fake data only, no real dictionary yet.",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

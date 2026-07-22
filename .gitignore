@@ -1,0 +1,17 @@
+# Build artifacts (once a bundler is introduced)
+dist/
+build/
+*.crx
+*.pem
+
+# Dependencies (once package.json exists)
+node_modules/
+
+# OS/editor cruft
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+
+# Local dictionary data bundles (downloaded, not committed — see architecture doc)
+data/local-dictionary/
