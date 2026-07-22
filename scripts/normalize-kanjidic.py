@@ -10,10 +10,11 @@ to two dozen paper dictionaries we'll never use, codepoints, radicals, etc).
 Usage:
     python3 scripts/normalize-kanjidic.py dict/kanjidic/kanjidic2-en-3.6.2.json dict/kanjidic/normalized.json
 
-Note on jlptLevel: KANJIDIC2's own jlptLevel field uses the OLD 4-level
-JLPT scale from before the 2010 revision (1-4, not N1-N5), and hasn't been
-updated since. It's kept here as jlptLevelLegacy so it's not silently
-mistaken for the current N1-N5 scale used elsewhere in this project.
+Note: KANJIDIC2's own jlptLevel field uses the OLD 4-level JLPT scale from
+before the 2010 revision and hasn't been updated since — it's dropped
+entirely here rather than kept under any name. KanjiInfo has no jlptLevel
+field; JLPT level lives only on the word-level DictionaryEntry, sourced
+from the word dictionary (Jitendex/JMdict), not from kanji data.
 """
 
 import json
@@ -50,7 +51,6 @@ def normalize(raw):
             "kunyomi": kunyomi,
             "strokeCount": stroke_counts[0] if stroke_counts else None,
             "grade": misc.get("grade"),
-            "jlptLevelLegacy": misc.get("jlptLevel"),
             "frequencyRank": misc.get("frequency"),
         }
         if han_viet:

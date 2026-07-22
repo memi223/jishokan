@@ -24,10 +24,11 @@ described in architecture v2. Each subfolder is one source.
 - **Bonus**: KANJIDIC2 already includes Hán-Việt readings per character
   (kept as `hanViet` in the normalized output) — no separate
   Vietnamese-specific kanji source needed for that part.
-- **Known quirk**: `jlptLevelLegacy` uses KANJIDIC2's own pre-2010 4-level
-  JLPT scale (1–4), not the current N1–N5 scale used elsewhere in this
-  project. It hasn't been updated since the reform, so treat it as a rough
-  signal, not authoritative — don't map it directly to `JlptLevel`.
+- **No `jlptLevel` field**: KANJIDIC2's own JLPT data uses the old
+  pre-2010 4-level scale and was dropped entirely rather than kept under
+  any name — `KanjiInfo` has no `jlptLevel` field. JLPT level lives only
+  on the word-level `DictionaryEntry`, sourced from the word dictionary
+  (Jitendex/JMdict), not from kanji data.
 - **To regenerate** (e.g. after a newer release): download a fresh
   `kanjidic2-en-*.json.tgz` from jmdict-simplified releases, extract it,
   then:
