@@ -13,5 +13,10 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
-# Local dictionary data bundles (downloaded, not committed — see architecture doc)
-data/local-dictionary/
+# Raw extracted intermediate JSON (regenerate via scripts/normalize-*.py
+# from the committed .tgz source archive in dict/ — no need to commit both)
+dict/kanjidic/kanjidic2-en-*.json
+
+# Large local dictionary sources not yet checked in (e.g. Jitendex zip
+# before you've added a normalizer for it — see dict/jitendex/README.md)
+dict/jitendex/*.zip

@@ -32,3 +32,11 @@ Split `content.js` into `content/selectionDetector.js` +
 architecture doc — swap `fakeLookup()` for a real message to the
 background worker, which is the only line that needs to change in this
 file.
+
+## Dictionary data
+
+See [`dict/README.md`](dict/README.md) — KANJIDIC2 is downloaded and
+normalized already; Jitendex needs one manual download (their site isn't
+reachable from an automated build step). `scripts/` holds the offline
+normalizers that turn raw source data into what the extension actually
+imports.
