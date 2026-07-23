@@ -6,7 +6,14 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
+      "js": [
+        "utils/extractKanji.js",
+        "services/kanji/kanjiIndex.js",
+        "services/dictionary/fakeGoiLookup.js",
+        "content/mode.js",
+        "content/overlay.js",
+        "content/selectionDetector.js"
+      ],
       "run_at": "document_idle"
     }
   ],

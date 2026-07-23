@@ -28,6 +28,25 @@ see below).
    character up directly, without needing Alt+K.
 5. Click outside the card, or press Escape, to dismiss it.
 
+## File layout
+
+No bundler yet — six plain `<script>`-style files, loaded in dependency
+order straight from `manifest.json`'s `content_scripts.js` array, sharing
+one global scope the same way multiple `<script>` tags on a page do:
+
+```
+utils/extractKanji.js               → services/kanji/kanjiIndex.js
+→ services/dictionary/fakeGoiLookup.js → content/mode.js
+→ content/overlay.js → content/selectionDetector.js (entry point, loads last)
+```
+
+`services/dictionary/fakeGoiLookup.js` is the one file in here that's
+explicitly temporary — it gets deleted, not refactored, once Jitendex is
+normalized and there's a real `DictionaryProvider` to call instead.
+Folders that don't have real code yet (`background/`, a real
+`services/dictionary/providers/`, anything TypeScript) don't exist in the
+repo — they show up when there's something to put in them, not before.
+
 ## One trade-off worth knowing about
 
 `manifest.json` now declares `dict/kanjidic/normalized.json` as a
