@@ -183,24 +183,21 @@ unchanged from v3.
 
 ---
 
-## 6. Open question: does Goi mode keep any kanji info at all?
+## 6. Resolved: Goi mode keeps a lightweight kanji link
 
-Worth deciding explicitly rather than defaulting silently, since it's a
-real trade-off:
+Decision: **keep the lightweight version.** Goi mode's card shows small
+tappable chips — one per unique kanji in the resolved word — that switch
+to Kanji mode and look that character up, rather than carrying full
+`KanjiInfo` data inline.
 
-- **Drop it entirely** (what this doc assumes) — Goi mode's card is
-  purely word-level; kanji detail lives only in Kanji mode. Simplest,
-  avoids two code paths ever answering a kanji question differently.
-- **Keep a lightweight version** — e.g. Goi mode's card still shows the
-  bare kanji characters from the headword as small tappable chips that
-  switch to Kanji mode and look them up, rather than the card itself
-  carrying full `KanjiInfo`. Slightly more UI work, but means you're
-  never stuck re-selecting text just to see what a kanji you're already
-  looking at means.
-
-Either is reasonable; the doc above assumes the first because it's less
-to build and matches "simple and lightweight" — say the word if you want
-the tappable-chip version instead and I'll fold it in.
+The nice part: this needs **no new field on `DictionaryEntry` at all**.
+The chips are just `extractKanji(entry.dictionaryForm ?? entry.originalText)`
+run at render time in the card component — the same utility Kanji mode
+already uses to filter a selection down to its kanji. Goi mode's card
+never touches `KanjiService` or KANJIDIC data directly; it only reuses
+the character-extraction logic and hands off to Kanji mode on tap.
+`DictionaryEntry` stays exactly as lean as dropping the field entirely
+would have made it.
 
 ---
 
@@ -256,4 +253,4 @@ src/
 | KANJIDIC for Kanji mode, not JMdict | JMdict doesn't have per-character on'yomi/kun'yomi/stroke-count/Hán-Việt data — that's KANJIDIC's whole job. Using JMdict here wouldn't just be suboptimal, it wouldn't work. |
 | Kanji mode has no deinflection step | Deinflection only makes sense for words that conjugate; individual kanji characters don't. Keeping Kanji mode's pipeline free of a step it structurally can't use is what makes it simpler than Goi mode, not just different. |
 | Mode switch via `chrome.commands` + badge, not a UI toggle | Zero new UI surface, native MV3 mechanism, and the badge means the current mode is always visible without opening anything — matches the "simple and lightweight" bar the rest of this project has been held to. |
-| `kanjiBreakdown` dropped from `DictionaryEntry` by default | Two code paths that could each answer "what does this kanji mean" (Goi mode's enrichment vs. Kanji mode itself) risk drifting apart or duplicating logic for no real benefit now that Kanji mode exists as a dedicated, better answer to that exact question. |
+| `kanjiBreakdown` dropped as a stored field, kanji chips computed at render time instead | Goi mode keeps the "jump to kanji detail" convenience without carrying `KanjiInfo` data it doesn't otherwise need — `extractKanji` is reused rather than duplicated, and `DictionaryEntry` stays exactly as small as the "drop it entirely" option would have made it. |

@@ -1,13 +1,19 @@
 {
   "manifest_version": 3,
   "name": "Japanese Reading Helper (dev)",
-  "version": "0.0.1",
-  "description": "Highlight Japanese text on any page to see a lookup card. Dev slice: fake data only, no real dictionary yet.",
+  "version": "0.1.0",
+  "description": "Highlight Japanese text on any page. Kanji mode: real KANJIDIC2 lookups. Goi mode: word lookup, still fake data (Jitendex not wired up yet).",
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["dict/kanjidic/normalized.json"],
+      "matches": ["<all_urls>"]
     }
   ]
 }

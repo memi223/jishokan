@@ -1,22 +1,60 @@
 // content.js
 //
-// First vertical slice. On purpose, this file does three things and
-// nothing else:
-//   1. Detect when the user finishes highlighting text (SelectionDetector)
-//   2. Mount a small card in a Shadow DOM root near the selection (Overlay)
-//   3. Render idle/loading/success/error states from a FAKE lookup
+// Two modes now, toggled with Alt+K:
+//   - Kanji mode: selection is filtered to its kanji characters, each one
+//     looked up directly in KANJIDIC (REAL data — dict/kanjidic/normalized.json,
+//     bundled with the extension, no network).
+//   - Goi mode (語彙, vocabulary): whole selection looked up as a word.
+//     Still fakeLookup() — Jitendex isn't wired up yet.
 //
-// No background worker, no network, no real dictionary. Those slot in
-// later by replacing fakeLookup() with a chrome.runtime message — nothing
-// else in this file should need to change when that happens.
+// Background worker / message passing still doesn't exist. Kanji mode
+// reads its bundled JSON directly here because that's simplest for now;
+// moving it behind chrome.runtime messages later is a contained change,
+// same as it always was for fakeLookup().
 
 (() => {
   'use strict';
 
   // ---------------------------------------------------------------------
-  // 1. Fake dictionary — stand-in for the future DictionaryService.
-  //    A handful of real entries so the UI has something to show, plus a
-  //    generic fallback so ANY selection demonstrates the full card.
+  // extractKanji — shared by both modes: Kanji mode uses it to filter a
+  // raw selection down to CJK characters; Goi mode uses it to compute
+  // which kanji chips to show on a resolved word, at render time (no
+  // separate field stored on the entry for this — see architecture v4 §6).
+  // ---------------------------------------------------------------------
+
+  const KANJI_RANGE = /[\u4E00-\u9FFF]/g;
+
+  function extractKanji(text) {
+    const matches = text.match(KANJI_RANGE) || [];
+    return [...new Set(matches)]; // unique, in order of first appearance
+  }
+
+  // ---------------------------------------------------------------------
+  // Kanji mode data — REAL KANJIDIC2 data, bundled in the extension.
+  // Lazily fetched once per tab and cached in memory as a Map.
+  // ---------------------------------------------------------------------
+
+  let kanjiIndexPromise = null;
+
+  function loadKanjiIndex() {
+    if (!kanjiIndexPromise) {
+      kanjiIndexPromise = fetch(chrome.runtime.getURL('dict/kanjidic/normalized.json'))
+        .then((res) => res.json())
+        .then((data) => new Map(data.characters.map((c) => [c.character, c])));
+    }
+    return kanjiIndexPromise;
+  }
+
+  function kanjiLookup(characters) {
+    return loadKanjiIndex().then((index) =>
+      characters.map((ch) => index.get(ch)).filter(Boolean),
+    );
+  }
+
+  // ---------------------------------------------------------------------
+  // Goi mode data — still fake. A handful of real entries so the UI has
+  // something to show, plus a generic fallback so ANY selection
+  // demonstrates the full card.
   // ---------------------------------------------------------------------
 
   const DEMO_ENTRIES = {
@@ -26,7 +64,6 @@
       jlptLevel: 'N5',
       meanings: ['to eat'],
       exampleSentences: [{ japanese: '朝ごはんを食べる。', translation: 'I eat breakfast.' }],
-      kanjiBreakdown: [{ character: '食', meanings: ['eat', 'food'], onyomi: ['ショク'], kunyomi: ['た.べる'] }],
     },
     '大きい': {
       reading: 'おおきい',
@@ -34,7 +71,6 @@
       jlptLevel: 'N5',
       meanings: ['big', 'large'],
       exampleSentences: [{ japanese: '大きい犬ですね。', translation: "That's a big dog." }],
-      kanjiBreakdown: [{ character: '大', meanings: ['big', 'large'], onyomi: ['ダイ', 'タイ'], kunyomi: ['おお.きい'] }],
     },
     '猫': {
       reading: 'ねこ',
@@ -42,7 +78,6 @@
       jlptLevel: 'N5',
       meanings: ['cat'],
       exampleSentences: [{ japanese: '猫が好きです。', translation: 'I like cats.' }],
-      kanjiBreakdown: [{ character: '猫', meanings: ['cat'], onyomi: ['ビョウ'], kunyomi: ['ねこ'] }],
     },
     '学生': {
       reading: 'がくせい',
@@ -50,18 +85,10 @@
       jlptLevel: 'N5',
       meanings: ['student'],
       exampleSentences: [{ japanese: '彼は学生です。', translation: 'He is a student.' }],
-      kanjiBreakdown: [
-        { character: '学', meanings: ['study', 'learning'], onyomi: ['ガク'], kunyomi: ['まな.ぶ'] },
-        { character: '生', meanings: ['life', 'birth'], onyomi: ['セイ'], kunyomi: ['い.きる'] },
-      ],
     },
   };
 
-  /**
-   * Stand-in for services/dictionary/DictionaryService.lookup().
-   * Simulates network latency and returns a normalized-shape entry.
-   * Selecting the literal word "error" demonstrates the error state.
-   */
+  /** Stand-in for services/dictionary/DictionaryService.lookup() (Goi mode). */
   function fakeLookup(text) {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -77,18 +104,36 @@
           jlptLevel: known ? known.jlptLevel : undefined,
           meanings: known ? known.meanings : [`(demo data — "${text}" isn't in the sample set yet)`],
           exampleSentences: known ? known.exampleSentences : [],
-          kanjiBreakdown: known ? known.kanjiBreakdown : [],
           isDemoData: true,
         });
-      }, 350); // pretend this is a network/IndexedDB round trip
+      }, 350);
     });
   }
 
   // ---------------------------------------------------------------------
-  // 2. Overlay — Shadow DOM mount, isolated from the host page's CSS.
+  // Mode state — in-memory only for now (resets on page reload). A real
+  // chrome.commands + background badge, per architecture v4 §1, is the
+  // planned upgrade; Alt+K here is a content-script-only stand-in that
+  // gets the same UX without needing a background worker yet.
   // ---------------------------------------------------------------------
 
-  const CARD_STYLES = `
+  let currentMode = 'goi'; // 'kanji' | 'goi'
+  let modePillEl = null;
+
+  function setMode(mode) {
+    currentMode = mode;
+    if (modePillEl) {
+      modePillEl.textContent = mode === 'kanji' ? '字 Kanji mode' : '語 Goi mode';
+      modePillEl.classList.add('pulse');
+      setTimeout(() => modePillEl && modePillEl.classList.remove('pulse'), 600);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Overlay — Shadow DOM mount, isolated from the host page's CSS.
+  // ---------------------------------------------------------------------
+
+  const STYLES = `
     :host { all: initial; }
     .card {
       position: fixed;
@@ -146,7 +191,7 @@
     .example .jp { font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif; }
     .example .en { color: #7A7368; font-size: 12px; }
     @media (prefers-color-scheme: dark) { .example .en { color: #A69C8C; } }
-    .kanji-row { display: flex; gap: 6px; margin-top: 10px; }
+    .kanji-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
     .kanji-chip {
       font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
       width: 26px; height: 26px;
@@ -154,12 +199,50 @@
       border-radius: 6px;
       background: rgba(178, 58, 46, 0.08);
       font-size: 15px;
+      cursor: pointer;
+      border: none;
+      color: inherit;
+      padding: 0;
     }
+    .kanji-chip:hover { background: rgba(178, 58, 46, 0.18); }
     .loading, .error { color: #7A7368; }
     .error { color: #B23A2E; }
     @media (prefers-color-scheme: dark) { .loading { color: #A69C8C; } .error { color: #D1584A; } }
     .note { margin-top: 8px; font-size: 11px; color: #7A7368; font-style: italic; }
     @media (prefers-color-scheme: dark) { .note { color: #A69C8C; } }
+
+    /* Kanji mode: list of characters instead of one headword */
+    .kanji-entry + .kanji-entry { margin-top: 10px; padding-top: 10px; border-top: 1px solid #E4DCC8; }
+    @media (prefers-color-scheme: dark) { .kanji-entry + .kanji-entry { border-color: #332C22; } }
+    .kanji-entry-head { display: flex; align-items: baseline; gap: 10px; }
+    .kanji-entry-char {
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+      font-size: 26px;
+      font-weight: 600;
+    }
+    .kanji-entry-readings { font-size: 12px; color: #7A7368; }
+    @media (prefers-color-scheme: dark) { .kanji-entry-readings { color: #A69C8C; } }
+    .kanji-entry-meanings { font-size: 12px; margin-top: 2px; }
+    .hanviet { color: #B23A2E; }
+    @media (prefers-color-scheme: dark) { .hanviet { color: #D1584A; } }
+
+    /* Mode indicator pill, fixed top-right of the viewport */
+    .mode-pill {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 2147483647;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(31, 27, 22, 0.55);
+      color: #FAF7F0;
+      font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+      font-size: 11px;
+      opacity: 0.35;
+      transition: opacity 150ms ease-out;
+      pointer-events: none;
+    }
+    .mode-pill.pulse { opacity: 0.9; }
   `;
 
   let hostEl = null;
@@ -173,11 +256,29 @@
     document.documentElement.appendChild(hostEl);
     shadowRoot = hostEl.attachShadow({ mode: 'open' });
     const style = document.createElement('style');
-    style.textContent = CARD_STYLES;
+    style.textContent = STYLES;
     shadowRoot.appendChild(style);
+
     cardEl = document.createElement('div');
     cardEl.className = 'card';
     shadowRoot.appendChild(cardEl);
+
+    modePillEl = document.createElement('div');
+    modePillEl.className = 'mode-pill';
+    modePillEl.textContent = currentMode === 'kanji' ? '字 Kanji mode' : '語 Goi mode';
+    shadowRoot.appendChild(modePillEl);
+
+    // Clicking a kanji chip anywhere in the card (Goi mode's lightweight
+    // links, or a future re-lookup from Kanji mode's own list) switches
+    // to Kanji mode and looks that single character up.
+    cardEl.addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-kanji-char]');
+      if (!chip) return;
+      const char = chip.getAttribute('data-kanji-char');
+      setMode('kanji');
+      renderLoading(char);
+      kanjiLookup([char]).then(renderKanjiList).catch((err) => renderError(char, err));
+    });
   }
 
   function positionCard(rect) {
@@ -204,7 +305,7 @@
   }
 
   // ---------------------------------------------------------------------
-  // 3. Render — idle / loading / success / error, matching LookupState.
+  // Render — idle / loading / success / error for both modes.
   // ---------------------------------------------------------------------
 
   function renderLoading(text) {
@@ -212,18 +313,28 @@
   }
 
   function renderError(text, error) {
-    cardEl.innerHTML = `<div class="error">Couldn't look up "${escapeHtml(text)}" — ${escapeHtml(error.message || 'unknown error')}</div>`;
+    cardEl.innerHTML = `<div class="error">Couldn't look up "${escapeHtml(text)}" — ${escapeHtml((error && error.message) || 'unknown error')}</div>`;
   }
 
-  function renderEntry(entry) {
+  function renderKanjiEmpty(text) {
+    cardEl.innerHTML = `<div class="loading">No kanji found in "${escapeHtml(text)}".</div>`;
+  }
+
+  function kanjiChipsRow(characters) {
+    if (!characters.length) return '';
+    return `<div class="kanji-row">${characters
+      .map((ch) => `<button class="kanji-chip" data-kanji-char="${escapeHtml(ch)}" title="Look up ${escapeHtml(ch)} in Kanji mode">${escapeHtml(ch)}</button>`)
+      .join('')}</div>`;
+  }
+
+  /** Goi mode: one word. */
+  function renderGoiEntry(entry) {
     const badges = [
       entry.jlptLevel ? `<span class="badge jlpt">${escapeHtml(entry.jlptLevel)}</span>` : '',
       entry.wordType ? `<span class="badge">${escapeHtml(entry.wordType.label)}</span>` : '',
     ].join('');
 
-    const meanings = (entry.meanings || [])
-      .map((m) => `<li>${escapeHtml(m)}</li>`)
-      .join('');
+    const meanings = (entry.meanings || []).map((m) => `<li>${escapeHtml(m)}</li>`).join('');
 
     const example = entry.exampleSentences && entry.exampleSentences[0]
       ? `<div class="example">
@@ -232,14 +343,12 @@
          </div>`
       : '';
 
-    const kanjiRow = entry.kanjiBreakdown && entry.kanjiBreakdown.length
-      ? `<div class="kanji-row">${entry.kanjiBreakdown
-          .map((k) => `<div class="kanji-chip" title="${escapeHtml((k.meanings || []).join(', '))}">${escapeHtml(k.character)}</div>`)
-          .join('')}</div>`
-      : '';
+    // Lightweight kanji links — computed here, not stored on the entry
+    // (architecture v4 §6). Click one to jump into Kanji mode for it.
+    const kanjiChips = kanjiChipsRow(extractKanji(entry.dictionaryForm || entry.originalText));
 
     const note = entry.isDemoData && !DEMO_ENTRIES[entry.originalText]
-      ? `<div class="note">demo data — dictionary not connected yet</div>`
+      ? `<div class="note">demo data — Jitendex not connected yet</div>`
       : '';
 
     cardEl.innerHTML = `
@@ -253,14 +362,43 @@
       ${badges ? `<div class="badges">${badges}</div>` : ''}
       <ul class="meanings">${meanings}</ul>
       ${example}
-      ${kanjiRow}
+      ${kanjiChips}
       ${note}
     `;
   }
 
+  /** Kanji mode: one or more characters, each its own compact entry. Real KANJIDIC2 data. */
+  function renderKanjiList(entries) {
+    if (!entries.length) {
+      cardEl.innerHTML = `<div class="loading">No data found for that kanji.</div>`;
+      return;
+    }
+    cardEl.innerHTML = entries
+      .map((k) => {
+        const readings = [k.onyomi.join('、'), k.kunyomi.join('、')].filter(Boolean).join('  ·  ');
+        const hanViet = k.hanViet && k.hanViet.length
+          ? `<span class="hanviet"> — ${escapeHtml(k.hanViet.join(', '))}</span>`
+          : '';
+        const meta = [
+          k.strokeCount ? `${k.strokeCount} strokes` : '',
+          k.grade ? `grade ${k.grade}` : '',
+        ].filter(Boolean).join(' · ');
+        return `
+          <div class="kanji-entry">
+            <div class="kanji-entry-head">
+              <span class="kanji-entry-char">${escapeHtml(k.character)}</span>
+              <span class="kanji-entry-readings">${escapeHtml(readings)}${hanViet}</span>
+            </div>
+            <div class="kanji-entry-meanings">${escapeHtml(k.meanings.join(', '))}</div>
+            ${meta ? `<div class="note">${escapeHtml(meta)}</div>` : ''}
+          </div>
+        `;
+      })
+      .join('');
+  }
+
   // ---------------------------------------------------------------------
-  // 4. SelectionDetector — mouseup is enough for a first pass: it fires
-  //    once, right when the user releases after dragging a selection.
+  // SelectionDetector — mouseup, branching by mode.
   // ---------------------------------------------------------------------
 
   let lastText = '';
@@ -274,7 +412,7 @@
       lastText = '';
       return;
     }
-    if (text === lastText) return; // same selection, don't re-fire
+    if (text === lastText) return;
     lastText = text;
 
     const range = selection.getRangeAt(0);
@@ -282,24 +420,29 @@
 
     ensureMounted();
     positionCard(rect);
-    renderLoading(text);
     show();
 
-    fakeLookup(text).then(
-      (entry) => {
-        if (lastText !== text) return; // selection moved on while we "loaded"
-        renderEntry(entry);
-      },
-      (error) => {
-        if (lastText !== text) return;
-        renderError(text, error);
-      },
-    );
+    if (currentMode === 'kanji') {
+      const characters = extractKanji(text);
+      if (!characters.length) {
+        renderKanjiEmpty(text);
+        return;
+      }
+      renderLoading(text);
+      kanjiLookup(characters).then(
+        (entries) => { if (lastText === text) renderKanjiList(entries); },
+        (error) => { if (lastText === text) renderError(text, error); },
+      );
+    } else {
+      renderLoading(text);
+      fakeLookup(text).then(
+        (entry) => { if (lastText === text) renderGoiEntry(entry); },
+        (error) => { if (lastText === text) renderError(text, error); },
+      );
+    }
   }
 
   function onMouseDown(event) {
-    // Dismiss when clicking outside the card (but not when starting a
-    // new selection drag inside the page, which onMouseUp handles).
     if (hostEl && !event.composedPath().includes(hostEl)) {
       hideCard();
       lastText = '';
@@ -312,6 +455,12 @@
     if (e.key === 'Escape') {
       hideCard();
       lastText = '';
+      return;
+    }
+    // Alt+K toggles mode. Content-script-only stand-in for the
+    // chrome.commands + background badge planned in architecture v4 §1.
+    if (e.altKey && e.key.toLowerCase() === 'k') {
+      setMode(currentMode === 'kanji' ? 'goi' : 'kanji');
     }
   });
 })();

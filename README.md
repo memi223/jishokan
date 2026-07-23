@@ -1,42 +1,60 @@
-# Dev slice: selection card with fake data
+# Dev slice: two modes, one real, one still fake
 
-What this is: a content script that watches for text selection and shows a
-card with dictionary-shaped info — no real dictionary, no background
-worker, no network calls. Everything is one file (`content.js`) on purpose.
+**Kanji mode** — select text, it's filtered down to kanji characters
+only, each one looked up in **real KANJIDIC2 data** (bundled in the
+extension, no network). Try selecting `大きい猫` — only 大 and 猫 get
+looked up.
+
+**Goi mode** (語彙, vocabulary) — select a word, see word-level info.
+Still `fakeLookup()` — Jitendex isn't wired up yet.
+
+**Alt+K** toggles between them. A small pill in the top-right corner
+shows which mode is active (this is a content-script stand-in for the
+real `chrome.commands` + toolbar badge planned in the architecture doc —
+see below).
 
 ## Try it
 
-1. `chrome://extensions`
-2. Enable **Developer mode** (top right)
-3. **Load unpacked** → select this folder
-4. Go to any page and select one of these to see real demo data:
-   `食べる`, `大きい`, `猫`, `学生`
-5. Select any other text (Japanese or not) to see the generic fallback
-   card, or select the literal word `error` to see the error state.
-6. Click outside the card, or press Escape, to dismiss it.
+1. `chrome://extensions` → Developer mode → **Load unpacked** → this folder
+2. Default mode is **Goi**. Select `食べる`, `大きい`, `猫`, or `学生` for
+   real demo entries; anything else shows the generic fallback card;
+   select the word `error` to see the error state.
+3. Press **Alt+K** to switch to **Kanji mode**. Select any text with
+   kanji in it — this one's real, pulled straight from
+   `dict/kanjidic/normalized.json`. Try characters you didn't already
+   see, like `食` from 食べる, or something unrelated like `新聞`.
+4. In Goi mode, the small character chip(s) under a word's meanings are
+   clickable — tapping one jumps into Kanji mode and looks that
+   character up directly, without needing Alt+K.
+5. Click outside the card, or press Escape, to dismiss it.
+
+## One trade-off worth knowing about
+
+`manifest.json` now declares `dict/kanjidic/normalized.json` as a
+**web-accessible resource**, which is the only way a content script (not
+just an extension page) can `fetch()` a bundled file — confirmed against
+Chrome's current docs, not assumed. The real cost: this also makes that
+file fetchable by scripts on any page you visit, which is a minor
+fingerprinting surface (a site could detect this extension is installed).
+For a personal local dictionary, low stakes — but if this ever moves to
+a background worker doing the lookup instead (per the architecture doc's
+original plan), that requirement goes away entirely, since a background
+worker can read its own bundled files without `web_accessible_resources`
+at all.
 
 ## What's deliberately not here yet
 
-- Real dictionary (Mazii or local JMdict) — `fakeLookup()` is the seam
-  where a `chrome.runtime.sendMessage(...)` call replaces the `setTimeout`
-  later, without touching anything else in the file.
-- Background service worker / message passing.
-- Deinflection (食べた won't resolve to 食べる yet).
-- Kanji click-through, dark mode toggle (dark mode does follow the OS
-  setting already, via `prefers-color-scheme`).
+- Goi mode's real dictionary (Jitendex) — `fakeLookup()` is still the
+  seam where a real message to a background worker replaces the
+  `setTimeout`.
+- Background service worker / message passing for either mode. Kanji
+  mode fetches its bundled JSON directly in the content script for now —
+  simplest thing that works, not the final architecture.
+- Real `chrome.commands` + toolbar badge for mode switching (Alt+K here
+  is a page-focused keydown listener, not a true global shortcut).
+- Deinflection (食べた won't resolve to 食べる in Goi mode yet).
 
-## Next slice, when you're ready
+## Architecture docs
 
-Split `content.js` into `content/selectionDetector.js` +
-`content/overlay/` and add `background/` + `services/dictionary/` per the
-architecture doc — swap `fakeLookup()` for a real message to the
-background worker, which is the only line that needs to change in this
-file.
-
-## Dictionary data
-
-See [`dict/README.md`](dict/README.md) — KANJIDIC2 is downloaded and
-normalized already; Jitendex needs one manual download (their site isn't
-reachable from an automated build step). `scripts/` holds the offline
-normalizers that turn raw source data into what the extension actually
-imports.
+See `docs/architecture-v4.md` (and v1–v3 for how we got here) for the
+full design this is one slice of.
