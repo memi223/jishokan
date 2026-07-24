@@ -64,6 +64,11 @@ const STYLES = `
   .example .jp { font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif; }
   .example .en { color: #7A7368; font-size: 12px; }
   @media (prefers-color-scheme: dark) { .example .en { color: #A69C8C; } }
+  .definition {
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    margin-top: 6px;
+    line-height: 1.7;
+  }
   .kanji-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
   .kanji-chip {
     box-sizing: border-box;
@@ -141,12 +146,15 @@ let hostEl = null;
 let shadowRoot = null;
 let cardEl = null;
 
-// lastGoiEntry: the most recently rendered Goi-mode entry — what "back"
-// returns to. kanjiChipContext: the sibling kanji characters to show as
-// a chip row while browsing Kanji mode, set when arriving via a Goi
-// word's chip (or a sibling chip within that same context), cleared on
-// any fresh, unrelated selection (see selectionDetector.js).
-let lastGoiEntry = null;
+// lastWordEntry: the most recently rendered word entry (JP-EN or JP-JP) —
+// what "back" returns to, from Kanji mode. lastWordMode records which of
+// the two so "back" can re-render it correctly. kanjiChipContext: the
+// sibling kanji characters to show as a chip row while browsing Kanji
+// mode, set when arriving via a word's chip (or a sibling chip within
+// that same context), cleared on any fresh, unrelated selection (see
+// selectionDetector.js).
+let lastWordEntry = null;
+let lastWordMode = null; // 'jp-en' | 'jp-jp'
 let kanjiChipContext = null;
 
 function ensureMounted() {
@@ -165,18 +173,20 @@ function ensureMounted() {
 
   modePillEl = document.createElement('div'); // shared binding from content/mode.js
   modePillEl.className = 'mode-pill';
-  modePillEl.textContent = currentMode === 'kanji' ? '字 Kanji mode' : '語 Goi mode';
+  modePillEl.textContent = MODE_LABELS[currentMode];
   shadowRoot.appendChild(modePillEl);
 
-  // Clicking a kanji chip anywhere in the card (Goi mode's lightweight
-  // links, or a sibling chip while already browsing Kanji mode) switches
-  // to Kanji mode and looks that single character up. Clicking "back"
-  // returns to the Goi entry that led here.
+  // Clicking a kanji chip anywhere in the card (a word entry's
+  // lightweight links, or a sibling chip while already browsing Kanji
+  // mode) switches to Kanji mode and looks that single character up.
+  // Clicking "back" returns to whichever word entry (JP-EN or JP-JP)
+  // led here.
   cardEl.addEventListener('click', (e) => {
-    if (e.target.closest('[data-action="back-to-goi"]')) {
-      if (lastGoiEntry) {
-        setMode('goi');
-        renderGoiEntry(lastGoiEntry);
+    if (e.target.closest('[data-action="back-to-word"]')) {
+      if (lastWordEntry && lastWordMode) {
+        setMode(lastWordMode);
+        if (lastWordMode === 'jp-jp') renderJpJpEntry(lastWordEntry);
+        else renderJpEnEntry(lastWordEntry);
       }
       return;
     }
@@ -185,10 +195,10 @@ function ensureMounted() {
     if (!chip) return;
     const char = chip.getAttribute('data-kanji-char');
 
-    // A chip straight off a Goi word establishes the sibling context;
+    // A chip straight off a word entry establishes the sibling context;
     // a chip clicked while already browsing siblings keeps it as-is.
-    if (chip.hasAttribute('data-from-goi') && lastGoiEntry) {
-      kanjiChipContext = extractKanji(lastGoiEntry.dictionaryForm || lastGoiEntry.originalText);
+    if (chip.hasAttribute('data-from-word') && lastWordEntry) {
+      kanjiChipContext = extractKanji(lastWordEntry.dictionaryForm || lastWordEntry.originalText);
     }
 
     setMode('kanji');
@@ -240,20 +250,21 @@ function renderKanjiEmpty(text) {
 
 function kanjiChipsRow(characters, options) {
   if (!characters.length) return '';
-  const fromGoi = options && options.fromGoi;
+  const fromWord = options && options.fromWord;
   const activeChar = options && options.active;
   return `<div class="kanji-row">${characters
     .map((ch) => {
       const classes = ['kanji-chip', ch === activeChar ? 'active' : ''].filter(Boolean).join(' ');
-      const fromGoiAttr = fromGoi ? 'data-from-goi="true"' : '';
-      return `<button class="${classes}" data-kanji-char="${escapeHtml(ch)}" ${fromGoiAttr} title="Look up ${escapeHtml(ch)} in Kanji mode">${escapeHtml(ch)}</button>`;
+      const fromWordAttr = fromWord ? 'data-from-word="true"' : '';
+      return `<button class="${classes}" data-kanji-char="${escapeHtml(ch)}" ${fromWordAttr} title="Look up ${escapeHtml(ch)} in Kanji mode">${escapeHtml(ch)}</button>`;
     })
     .join('')}</div>`;
 }
 
-/** Goi mode: one word. */
-function renderGoiEntry(entry) {
-  lastGoiEntry = entry; // what a later "back" button in Kanji mode returns to
+/** JP-EN mode: one word, English meanings (Jitendex — still fake data). */
+function renderJpEnEntry(entry) {
+  lastWordEntry = entry;
+  lastWordMode = 'jp-en';
 
   const badges = [
     entry.jlptLevel ? `<span class="badge jlpt">${escapeHtml(entry.jlptLevel)}</span>` : '',
@@ -271,7 +282,7 @@ function renderGoiEntry(entry) {
 
   // Lightweight kanji links — computed here, not stored on the entry
   // (architecture v4 §6). Click one to jump into Kanji mode for it.
-  const kanjiChips = kanjiChipsRow(extractKanji(entry.dictionaryForm || entry.originalText), { fromGoi: true });
+  const kanjiChips = kanjiChipsRow(extractKanji(entry.dictionaryForm || entry.originalText), { fromWord: true });
 
   const note = entry.isDemoData && !DEMO_ENTRIES[entry.originalText]
     ? `<div class="note">demo data — Jitendex not connected yet</div>`
@@ -293,9 +304,38 @@ function renderGoiEntry(entry) {
   `;
 }
 
+/** JP-JP mode: one word, monolingual Japanese definition (no source
+ *  chosen yet — still fake data). Select text inside the definition to
+ *  chain another JP-JP lookup — "deep search" — same mouseup listener,
+ *  no special wiring for it here.
+ */
+function renderJpJpEntry(entry) {
+  lastWordEntry = entry;
+  lastWordMode = 'jp-jp';
+
+  const kanjiChips = kanjiChipsRow(extractKanji(entry.dictionaryForm || entry.originalText), { fromWord: true });
+
+  const note = entry.isDemoData && !DEMO_JP_JP_ENTRIES[entry.originalText]
+    ? `<div class="note">demo data — no JP-JP source connected yet</div>`
+    : '';
+
+  cardEl.innerHTML = `
+    <div class="head">
+      <div class="accent-bar"></div>
+      <div>
+        <span class="headword">${escapeHtml(entry.originalText)}</span>
+        ${entry.reading ? `<span class="reading">${escapeHtml(entry.reading)}</span>` : ''}
+      </div>
+    </div>
+    <div class="definition">${escapeHtml(entry.definition || '')}</div>
+    ${kanjiChips}
+    ${note}
+  `;
+}
+
 /** Kanji mode: one or more characters, each its own compact entry. Real KANJIDIC2 data.
  *  context (optional): { active: string, siblings: string[] | null } — when
- *  present and lastGoiEntry is set, shows a "back to <word>" button and a
+ *  present and lastWordEntry is set, shows a "back to <word>" button and a
  *  chip row for jumping between the other kanji from that same word.
  */
 function renderKanjiList(entries, context) {
@@ -305,8 +345,8 @@ function renderKanjiList(entries, context) {
   }
 
   const ctx = context || {};
-  const backButton = ctx.siblings && lastGoiEntry
-    ? `<button class="back-button" data-action="back-to-goi">← back to ${escapeHtml(lastGoiEntry.originalText)}</button>`
+  const backButton = ctx.siblings && lastWordEntry
+    ? `<button class="back-button" data-action="back-to-word">← back to ${escapeHtml(lastWordEntry.originalText)}</button>`
     : '';
   const siblingRow = ctx.siblings && ctx.siblings.length > 1
     ? kanjiChipsRow(ctx.siblings, { active: ctx.active })

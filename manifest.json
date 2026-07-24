@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Japanese Reading Helper (dev)",
-  "version": "0.1.0",
-  "description": "Highlight Japanese text on any page. Kanji mode: real KANJIDIC2 lookups. Goi mode: word lookup, still fake data (Jitendex not wired up yet).",
+  "version": "0.2.0",
+  "description": "Highlight Japanese text on any page. Three modes (Alt+K to cycle): Kanji (real KANJIDIC2), JP-EN (Jitendex, still fake data), JP-JP (monolingual, still fake data — no source picked yet).",
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
       "js": [
         "utils/extractKanji.js",
         "services/kanji/kanjiIndex.js",
-        "services/dictionary/fakeGoiLookup.js",
+        "services/dictionary/fakeJpEnLookup.js",
+        "services/dictionary/fakeJpJpLookup.js",
         "content/mode.js",
         "content/overlay.js",
         "content/selectionDetector.js"

@@ -1,8 +1,8 @@
-// services/dictionary/fakeGoiLookup.js
+// services/dictionary/fakeJpEnLookup.js
 //
 // TEMPORARY. This whole file gets deleted once Jitendex is normalized
 // and wired up — it'll be replaced by
-// services/dictionary/providers/JitendexProvider.js implementing the
+// services/dictionary/providers/JitendexProvider.js (JP-EN) implementing the
 // DictionaryProvider interface from the architecture docs, called
 // through a real DictionaryService/ProviderRegistry, not called
 // directly like this.
@@ -42,8 +42,8 @@ const DEMO_ENTRIES = {
   },
 };
 
-/** Stand-in for services/dictionary/DictionaryService.lookup() (Goi mode). */
-function fakeLookup(text) {
+/** Stand-in for services/dictionary/DictionaryService.lookup() (JP-EN mode). */
+function fakeJpEnLookup(text) {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       if (text === 'error') {
