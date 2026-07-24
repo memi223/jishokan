@@ -66,6 +66,7 @@ const STYLES = `
   @media (prefers-color-scheme: dark) { .example .en { color: #A69C8C; } }
   .kanji-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
   .kanji-chip {
+    box-sizing: border-box;
     font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     width: 26px; height: 26px;
     display: flex; align-items: center; justify-content: center;
@@ -73,11 +74,29 @@ const STYLES = `
     background: rgba(178, 58, 46, 0.08);
     font-size: 15px;
     cursor: pointer;
-    border: none;
+    border: 1px solid transparent;
     color: inherit;
     padding: 0;
   }
   .kanji-chip:hover { background: rgba(178, 58, 46, 0.18); }
+  .kanji-chip.active { border-color: #B23A2E; background: rgba(178, 58, 46, 0.18); }
+  @media (prefers-color-scheme: dark) { .kanji-chip.active { border-color: #D1584A; } }
+  .back-button {
+    display: block;
+    border: none;
+    background: none;
+    padding: 0 0 8px;
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+    font-size: 12px;
+    color: #7A7368;
+    cursor: pointer;
+  }
+  .back-button:hover { color: #B23A2E; }
+  @media (prefers-color-scheme: dark) {
+    .back-button { color: #A69C8C; }
+    .back-button:hover { color: #D1584A; }
+  }
   .loading, .error { color: #7A7368; }
   .error { color: #B23A2E; }
   @media (prefers-color-scheme: dark) { .loading { color: #A69C8C; } .error { color: #D1584A; } }
@@ -122,6 +141,14 @@ let hostEl = null;
 let shadowRoot = null;
 let cardEl = null;
 
+// lastGoiEntry: the most recently rendered Goi-mode entry — what "back"
+// returns to. kanjiChipContext: the sibling kanji characters to show as
+// a chip row while browsing Kanji mode, set when arriving via a Goi
+// word's chip (or a sibling chip within that same context), cleared on
+// any fresh, unrelated selection (see selectionDetector.js).
+let lastGoiEntry = null;
+let kanjiChipContext = null;
+
 function ensureMounted() {
   if (hostEl) return;
   hostEl = document.createElement('div');
@@ -142,14 +169,33 @@ function ensureMounted() {
   shadowRoot.appendChild(modePillEl);
 
   // Clicking a kanji chip anywhere in the card (Goi mode's lightweight
-  // links) switches to Kanji mode and looks that single character up.
+  // links, or a sibling chip while already browsing Kanji mode) switches
+  // to Kanji mode and looks that single character up. Clicking "back"
+  // returns to the Goi entry that led here.
   cardEl.addEventListener('click', (e) => {
+    if (e.target.closest('[data-action="back-to-goi"]')) {
+      if (lastGoiEntry) {
+        setMode('goi');
+        renderGoiEntry(lastGoiEntry);
+      }
+      return;
+    }
+
     const chip = e.target.closest('[data-kanji-char]');
     if (!chip) return;
     const char = chip.getAttribute('data-kanji-char');
+
+    // A chip straight off a Goi word establishes the sibling context;
+    // a chip clicked while already browsing siblings keeps it as-is.
+    if (chip.hasAttribute('data-from-goi') && lastGoiEntry) {
+      kanjiChipContext = extractKanji(lastGoiEntry.dictionaryForm || lastGoiEntry.originalText);
+    }
+
     setMode('kanji');
     renderLoading(char);
-    kanjiLookup([char]).then(renderKanjiList).catch((err) => renderError(char, err));
+    kanjiLookup([char])
+      .then((entries) => renderKanjiList(entries, { active: char, siblings: kanjiChipContext }))
+      .catch((err) => renderError(char, err));
   });
 }
 
@@ -192,15 +238,23 @@ function renderKanjiEmpty(text) {
   cardEl.innerHTML = `<div class="loading">No kanji found in "${escapeHtml(text)}".</div>`;
 }
 
-function kanjiChipsRow(characters) {
+function kanjiChipsRow(characters, options) {
   if (!characters.length) return '';
+  const fromGoi = options && options.fromGoi;
+  const activeChar = options && options.active;
   return `<div class="kanji-row">${characters
-    .map((ch) => `<button class="kanji-chip" data-kanji-char="${escapeHtml(ch)}" title="Look up ${escapeHtml(ch)} in Kanji mode">${escapeHtml(ch)}</button>`)
+    .map((ch) => {
+      const classes = ['kanji-chip', ch === activeChar ? 'active' : ''].filter(Boolean).join(' ');
+      const fromGoiAttr = fromGoi ? 'data-from-goi="true"' : '';
+      return `<button class="${classes}" data-kanji-char="${escapeHtml(ch)}" ${fromGoiAttr} title="Look up ${escapeHtml(ch)} in Kanji mode">${escapeHtml(ch)}</button>`;
+    })
     .join('')}</div>`;
 }
 
 /** Goi mode: one word. */
 function renderGoiEntry(entry) {
+  lastGoiEntry = entry; // what a later "back" button in Kanji mode returns to
+
   const badges = [
     entry.jlptLevel ? `<span class="badge jlpt">${escapeHtml(entry.jlptLevel)}</span>` : '',
     entry.wordType ? `<span class="badge">${escapeHtml(entry.wordType.label)}</span>` : '',
@@ -217,7 +271,7 @@ function renderGoiEntry(entry) {
 
   // Lightweight kanji links — computed here, not stored on the entry
   // (architecture v4 §6). Click one to jump into Kanji mode for it.
-  const kanjiChips = kanjiChipsRow(extractKanji(entry.dictionaryForm || entry.originalText));
+  const kanjiChips = kanjiChipsRow(extractKanji(entry.dictionaryForm || entry.originalText), { fromGoi: true });
 
   const note = entry.isDemoData && !DEMO_ENTRIES[entry.originalText]
     ? `<div class="note">demo data — Jitendex not connected yet</div>`
@@ -239,13 +293,26 @@ function renderGoiEntry(entry) {
   `;
 }
 
-/** Kanji mode: one or more characters, each its own compact entry. Real KANJIDIC2 data. */
-function renderKanjiList(entries) {
+/** Kanji mode: one or more characters, each its own compact entry. Real KANJIDIC2 data.
+ *  context (optional): { active: string, siblings: string[] | null } — when
+ *  present and lastGoiEntry is set, shows a "back to <word>" button and a
+ *  chip row for jumping between the other kanji from that same word.
+ */
+function renderKanjiList(entries, context) {
   if (!entries.length) {
     cardEl.innerHTML = `<div class="loading">No data found for that kanji.</div>`;
     return;
   }
-  cardEl.innerHTML = entries
+
+  const ctx = context || {};
+  const backButton = ctx.siblings && lastGoiEntry
+    ? `<button class="back-button" data-action="back-to-goi">← back to ${escapeHtml(lastGoiEntry.originalText)}</button>`
+    : '';
+  const siblingRow = ctx.siblings && ctx.siblings.length > 1
+    ? kanjiChipsRow(ctx.siblings, { active: ctx.active })
+    : '';
+
+  const entriesHtml = entries
     .map((k) => {
       const readings = [k.onyomi.join('、'), k.kunyomi.join('、')].filter(Boolean).join('  ·  ');
       const hanViet = k.hanViet && k.hanViet.length
@@ -267,4 +334,6 @@ function renderKanjiList(entries) {
       `;
     })
     .join('');
+
+  cardEl.innerHTML = `${backButton}${siblingRow}${entriesHtml}`;
 }

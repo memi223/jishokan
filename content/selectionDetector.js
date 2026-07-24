@@ -35,6 +35,10 @@ function onMouseUp() {
       renderKanjiEmpty(text);
       return;
     }
+    // A fresh manual selection isn't tied to whatever Goi word (if any)
+    // was last shown — drop that context so no stale "back" button or
+    // sibling row from an unrelated word shows up here.
+    kanjiChipContext = null;
     renderLoading(text);
     kanjiLookup(characters).then(
       (entries) => { if (lastText === text) renderKanjiList(entries); },
