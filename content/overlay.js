@@ -248,6 +248,10 @@ function renderKanjiEmpty(text) {
   cardEl.innerHTML = `<div class="loading">No kanji found in "${escapeHtml(text)}".</div>`;
 }
 
+function renderNoResults(text) {
+  cardEl.innerHTML = `<div class="loading">No Jitendex entry for "${escapeHtml(text)}".</div>`;
+}
+
 function kanjiChipsRow(characters, options) {
   if (!characters.length) return '';
   const fromWord = options && options.fromWord;
@@ -284,9 +288,7 @@ function renderJpEnEntry(entry) {
   // (architecture v4 §6). Click one to jump into Kanji mode for it.
   const kanjiChips = kanjiChipsRow(extractKanji(entry.dictionaryForm || entry.originalText), { fromWord: true });
 
-  const note = entry.isDemoData && !DEMO_ENTRIES[entry.originalText]
-    ? `<div class="note">demo data — Jitendex not connected yet</div>`
-    : '';
+  const note = ''; // real data now — no "demo data" caveat needed for JP-EN
 
   cardEl.innerHTML = `
     <div class="head">

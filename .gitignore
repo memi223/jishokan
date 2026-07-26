@@ -20,3 +20,8 @@ dict/kanjidic/kanjidic2-en-*.json
 # Large local dictionary sources not yet checked in (e.g. Jitendex zip
 # before you've added a normalizer for it — see dict/jitendex/README.md)
 dict/jitendex/*.zip
+
+# Jitendex's normalized output (~65MB) — regeneratable via
+# scripts/normalize-jitendex.py from the source zip, not worth bloating
+# git history or every future delivered copy of this repo with it
+dict/jitendex/normalized.json

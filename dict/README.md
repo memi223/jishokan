@@ -6,7 +6,7 @@ described in architecture v2. Each subfolder is one source.
 | Folder | Source | Role | Status |
 |---|---|---|---|
 | `kanjidic/` | KANJIDIC2 (via jmdict-simplified) | Kanji info — readings, meanings, stroke count, grade. **Always-local**, used regardless of which word provider answers a lookup. | ✅ set up |
-| `jitendex/` | Jitendex | Word dictionary — meanings + verb/adjective (POS/conjugation) tags. | ⏳ needs a manual download (see below) |
+| `jitendex/` | Jitendex | Word dictionary — meanings + verb/adjective (POS/conjugation) tags. | ✅ set up — but loaded very differently from kanjidic/, see below |
 
 ## kanjidic/
 
@@ -38,24 +38,57 @@ described in architecture v2. Each subfolder is one source.
 
 ## jitendex/
 
-Jitendex stopped publishing dictionary files as GitHub release assets
-(their releases page now only has the auto-generated source code archive,
-which is not the dictionary itself). It's distributed from their own site
-instead:
+Real, working — but with a real complication kanjidic/ didn't have:
+normalized, it's **~65MB** (≈279,000 unique terms vs. kanjidic's ~10,000
+characters), which made kanjidic/'s pattern — bundle the JSON, fetch it
+directly in the content script, hold it in an in-memory Map — a genuinely
+bad fit here: 65MB parsed synchronously per tab, duplicated across every
+open tab, was never going to be "lightweight."
 
-1. Go to https://jitendex.org/pages/downloads.html
-2. Download the **Yomitan** format zip (not MDict — Yomitan's format is a
-   zip of plain JSON files, much easier to write a normalizer for than
-   MDict's binary format)
-3. Place it at `dict/jitendex/jitendex-yomitan.zip` (gitignored for now,
-   since it's tens of MB — see below)
+So this one loads differently, for real architectural reasons, not just
+because it could:
 
-Next step once you have it: a `scripts/normalize-jitendex.py` that unzips
-it and reads its `term_bank_*.json` files (Yomitan's per-entry format:
-`[term, reading, tags, ruleTags, score, glossary, sequence, termTags]`
-per entry) into our `DictionaryEntry`/`WordType` shape — happy to write
-that once the file's actually in the folder, since I can't reach
-jitendex.org to fetch it myself from here.
+- **Source**: a Yomitan-format export from jitendex.org (CC BY-SA 4.0),
+  containing 217 `term_bank_*.json` files. Not committed here — tens of
+  MB, and regeneratable. If you need it again: jitendex.org →
+  Downloads → Yomitan format.
+- **`scripts/normalize-jitendex.py`** unzips it and walks each entry's
+  glossary, which — unlike kanjidic's flat JSON — is Yomitan's
+  "structured-content" format: a nested tree of `{tag, data, content}`
+  nodes (`div`/`span`/`ul`/`li`/`ruby`...). The script extracts each
+  sense's part-of-speech + glossary text and the first example sentence
+  pair, dropping furigana markup and JMdict/Tatoeba attribution links.
+  `ruleIdentifiers` (`v1`, `adj-i`, etc.) maps straight onto
+  `WordType`/`ConjugationClass` — same model kanjidic already used.
+- **Candidates are sorted by Jitendex's own `score` field** before the
+  score itself is dropped from the output — without this, headwords with
+  multiple JMdict entries (like 学生, which has 3) could surface an
+  obscure archaic reading before the common one, which is exactly what
+  happened on the first run before this fix.
+- **`dict/jitendex/normalized.json`** (gitignored — see `.gitignore`) is
+  the output: `{ terms: { [headword]: DictionaryEntry[] } }`, score-sorted,
+  ~65MB.
+- **Loading**: `background/importDictionaryData.js` fetches this bundled
+  file once, on install, and writes it into IndexedDB
+  (`background/db.js`) — a one-time cost, not a per-tab one. Lookups go
+  through `chrome.runtime.sendMessage` (`services/dictionary/jitendexProvider.js`
+  on the content-script side, `background/messageRouter.js` on the
+  other) rather than a direct fetch. This also means
+  `dict/jitendex/normalized.json` does **not** need a
+  `web_accessible_resources` entry in `manifest.json`, unlike
+  `dict/kanjidic/normalized.json` — that restriction gates access from a
+  foreign page's origin, and the background worker reading its own
+  bundled file is same-origin regardless.
+- **To regenerate**: place a fresh `jitendex-yomitan.zip` somewhere, then:
+  ```
+  unzip jitendex-yomitan.zip -d /tmp/jitendex-extracted
+  python3 scripts/normalize-jitendex.py /tmp/jitendex-extracted dict/jitendex/normalized.json
+  ```
+- **Known gap**: `wordType.label` is currently the raw JMdict tag
+  (`"v1"`, `"adj-i"`) rather than a human-readable label like "Ichidan
+  verb" — that mapping needs `tag_bank_1.json`, not done in this pass.
+- **Known gap**: no deinflection yet. 食べた won't resolve to 食べる.
+  `jitendexLookup()` does an exact-text lookup only.
 
 ## Licensing — read before distributing
 

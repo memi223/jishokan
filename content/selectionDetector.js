@@ -2,7 +2,7 @@
 //
 // Entry point — wires together everything loaded before it (see
 // manifest.json's content_scripts order: utils/extractKanji.js,
-// services/kanji/kanjiIndex.js, services/dictionary/fakeJpEnLookup.js,
+// services/kanji/kanjiIndex.js, services/dictionary/jitendexProvider.js,
 // services/dictionary/fakeJpJpLookup.js, content/mode.js,
 // content/overlay.js, then this file last).
 //
@@ -66,8 +66,12 @@ function onMouseUp() {
     );
   } else {
     renderLoading(text);
-    fakeJpEnLookup(text).then(
-      (entry) => { if (lastText === text) renderJpEnEntry(entry); },
+    jitendexLookup(text).then(
+      (entries) => {
+        if (lastText !== text) return;
+        if (!entries.length) { renderNoResults(text); return; }
+        renderJpEnEntry(entries[0]); // highest-scored candidate; see normalize-jitendex.py
+      },
       (error) => { if (lastText === text) renderError(text, error); },
     );
   }
