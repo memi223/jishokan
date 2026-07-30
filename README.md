@@ -14,10 +14,15 @@ select text *inside* the definition itself and it chains into another
 JP-JP lookup ("deep search") — same selection listener, no special
 wiring for it, since Shadow DOM selections bubble normally.
 
-**Alt+K** cycles through all three (JP-EN → Kanji → JP-JP → JP-EN...). A
-small pill in the top-right corner shows which mode is active (this is a
-content-script stand-in for the real `chrome.commands` + toolbar badge
-planned in the architecture doc — see below).
+**Alt+K** cycles through all three (JP-EN → Kanji → JP-JP → JP-EN...), or
+click the toolbar icon for a small popup with mode buttons and live
+dictionary status — both write to the same `chrome.storage.local` key, so
+switching mode from either place instantly updates every open tab, not
+just the current one. A small pill in the top-right corner of the page
+shows which mode is active there. The one thing still not real: Alt+K
+itself is a page-focused `keydown` listener, not Chrome's actual
+`chrome.commands` global-shortcut API — see "What's deliberately not
+here yet" below.
 
 ## Before you load this
 
@@ -62,6 +67,9 @@ utils/extractKanji.js → services/kanji/kanjiIndex.js
 
 background/index.js → background/db.js → background/importDictionaryData.js
 → background/messageRouter.js
+
+popup/index.html + popup/popup.js — independent extension page, opened by
+manifest.json's action.default_popup, not part of either load chain above
 ```
 
 Two loading strategies, on purpose, not by accident — see "Why JP-EN
@@ -114,8 +122,11 @@ selections the way Chromium is expected to.
   seam where a real message to the background worker replaces the
   `setTimeout`, same pattern JP-EN just went through.
 - Deinflection (食べた won't resolve to 食べる in JP-EN/JP-JP yet).
-- Real `chrome.commands` + toolbar badge for mode switching (Alt+K here
-  is a page-focused keydown listener, not a true global shortcut).
+- Real `chrome.commands` global shortcut for mode switching (Alt+K here
+  is still a page-focused `keydown` listener — mode *state* is now
+  properly shared via `chrome.storage`, but the key-capture mechanism
+  itself isn't Chrome's actual global-shortcut API yet, so it still only
+  works while a page has focus).
 - `wordType.label` on Jitendex entries is the raw JMdict tag (`"v1"`),
   not a human-readable label — needs Jitendex's `tag_bank_1.json`, not
   done in this pass.

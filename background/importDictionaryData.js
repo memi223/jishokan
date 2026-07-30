@@ -25,8 +25,12 @@ async function ensureJitendexImported() {
   const res = await fetch(chrome.runtime.getURL(JITENDEX_DATA_URL));
   const data = await res.json();
   await putTermsBulk(data.terms);
+  const termCount = Object.keys(data.terms).length;
+  await setMeta('jitendex-term-count', termCount); // read back by the
+                                                     // popup's status view —
+                                                     // O(1), not a live scan
   await setMeta('jitendex-import-version', IMPORT_FORMAT_VERSION);
-  console.log(`[jp-reading-helper] Imported ${Object.keys(data.terms).length} Jitendex terms.`);
+  console.log(`[jp-reading-helper] Imported ${termCount} Jitendex terms.`);
 }
 
 chrome.runtime.onInstalled.addListener(() => {

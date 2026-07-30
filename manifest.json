@@ -1,10 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Japanese Reading Helper (dev)",
-  "version": "0.3.0",
-  "description": "Highlight Japanese text on any page. Three modes (Alt+K to cycle): Kanji (real KANJIDIC2), JP-EN (real Jitendex, via a background worker + IndexedDB), JP-JP (monolingual, still fake data — no source picked yet).",
+  "version": "0.4.0",
+  "description": "Highlight Japanese text on any page. Three modes, switchable via the toolbar popup or Alt+K: Kanji (real KANJIDIC2), JP-EN (real Jitendex, via a background worker + IndexedDB), JP-JP (monolingual, still fake data — no source picked yet).",
+  "permissions": ["storage"],
   "background": {
     "service_worker": "background/index.js"
+  },
+  "action": {
+    "default_popup": "popup/index.html"
   },
   "content_scripts": [
     {

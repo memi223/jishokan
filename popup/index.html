@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    width: 260px;
+    margin: 0;
+    padding: 14px 16px;
+    font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+    font-size: 13px;
+    background: #FAF7F0;
+    color: #1F1B16;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #17140F; color: #EDE6D6; }
+  }
+  h1 {
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 12px;
+  }
+  .modes { display: flex; flex-direction: column; gap: 6px; }
+  .mode-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid #E4DCC8;
+    background: #FFFFFF;
+    color: inherit;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+  }
+  .mode-btn:hover { background: rgba(178, 58, 46, 0.06); }
+  .mode-btn.active { border-color: #B23A2E; background: rgba(178, 58, 46, 0.1); }
+  @media (prefers-color-scheme: dark) {
+    .mode-btn { border-color: #332C22; background: #1F1B16; }
+    .mode-btn.active { border-color: #D1584A; background: rgba(209, 88, 74, 0.15); }
+  }
+  .mode-glyph {
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+  }
+  .hint { margin-top: 10px; font-size: 11px; color: #7A7368; }
+  @media (prefers-color-scheme: dark) { .hint { color: #A69C8C; } }
+  .status {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #E4DCC8;
+    font-size: 11.5px;
+    color: #7A7368;
+  }
+  @media (prefers-color-scheme: dark) {
+    .status { border-color: #332C22; color: #A69C8C; }
+  }
+  .status div { margin-bottom: 3px; }
+</style>
+</head>
+<body>
+  <h1>Japanese Reading Helper</h1>
+  <div class="modes">
+    <button class="mode-btn" data-mode="jp-jp"><span class="mode-glyph">日</span> JP-JP</button>
+    <button class="mode-btn" data-mode="jp-en"><span class="mode-glyph">語</span> JP-EN</button>
+    <button class="mode-btn" data-mode="kanji"><span class="mode-glyph">字</span> Kanji</button>
+  </div>
+  <div class="hint">Applies to every open tab. Alt+K also cycles modes on the current page.</div>
+  <div class="status" id="status">Loading dictionary status…</div>
+  <script src="popup.js"></script>
+</body>
+</html>
