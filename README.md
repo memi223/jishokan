@@ -58,6 +58,49 @@ extension so the background worker's `onInstalled` fires again.
    a back button to return to whichever word mode you came from.
 6. Click outside the card, or press Escape, to dismiss it.
 
+## PDF reader
+
+The toolbar popup has a file input now: pick a PDF, and it opens in a new
+tab as plain web text — real DOM, not a rendered PDF page — so the exact
+same highlighting/lookup machinery works on it immediately, in all three
+modes. That's the whole feature: no new lookup logic, no new overlay
+code, just getting book-length Japanese text into a form the existing
+system already knows how to handle.
+
+How the file actually gets from the popup (where you pick it) to the
+reader tab (a completely separate page that doesn't exist yet at the
+moment you pick the file): the popup reads it as an `ArrayBuffer`, sends
+it to the background worker (`STORE_FILE`), which puts it in IndexedDB
+and hands back an id; the popup opens `reader/index.html?fileId=<id>`,
+and the reader page asks the background worker for that same file back
+(`GET_FILE`). Verified end-to-end with real binary data before commit —
+store, retrieve, byte-for-byte match, unknown ids handled cleanly, two
+uploads never colliding.
+
+Text extraction is [PDF.js](https://github.com/mozilla/pdf.js)
+(Apache-2.0), vendored directly in `vendor/pdfjs/` — not from npm/a CDN,
+just the three pieces text extraction actually needs (~3.3MB total, see
+`vendor/pdfjs/README.md`): the library, its worker, and the CJK character
+maps real Japanese PDFs often need to decode text correctly at all.
+
+**What I could verify from here, and what I couldn't:** the storage
+round-trip is real and tested. Three things aren't, and need an actual
+browser to confirm: whether an `ArrayBuffer` survives the real
+`chrome.runtime.sendMessage` structured-clone boundary the same way it
+did in my in-process test mock; whether the PDF.js worker actually loads
+via `chrome.runtime.getURL()` without needing a `web_accessible_resources`
+entry (expected, based on the same same-origin reasoning already
+confirmed for the background worker's own resource access — just not
+yet observed for a `Worker` specifically); and, of course, whether real
+Japanese PDF text comes out clean. First real test: load the extension
+and actually try it.
+
+**Known gap**: no separator between text items within a page, since
+Japanese doesn't use spaces between words — but that also means no line
+or paragraph breaks yet either; each page currently renders as one
+continuous block. Also no cleanup of old uploaded files from IndexedDB —
+they accumulate.
+
 ## File layout
 
 ```
@@ -70,6 +113,11 @@ background/index.js → background/db.js → background/importDictionaryData.js
 
 popup/index.html + popup/popup.js — independent extension page, opened by
 manifest.json's action.default_popup, not part of either load chain above
+
+reader/index.html — loads the SAME utils/services/content scripts above,
+then reader/reader.js (an ES module, the one exception to "no bundler,
+classic scripts everywhere" — isolated to this one page, needed because
+vendor/pdfjs/pdf.min.mjs is itself an ES module)
 ```
 
 Two loading strategies, on purpose, not by accident — see "Why JP-EN

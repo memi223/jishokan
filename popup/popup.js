@@ -43,3 +43,39 @@ chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (response) => {
   // no IndexedDB count to ask for. Static, not an oversight.
   statusEl.innerHTML = `<div>${jitendexLine}</div><div>KANJIDIC: bundled, ~10,384 characters</div>`;
 });
+
+// --- PDF upload -> reader tab ---
+//
+// The file's bytes go to the background worker (STORE_FILE), not
+// straight to a new tab — chrome.tabs.create() only takes a URL, there's
+// no way to hand a File object to a tab that doesn't exist yet, and this
+// popup closes the instant the new tab opens anyway. The reader tab asks
+// the background worker for the same file back by the id this returns.
+
+const fileInput = document.getElementById('file-input');
+const uploadStatusEl = document.getElementById('upload-status');
+
+fileInput.addEventListener('change', async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  uploadStatusEl.textContent = 'Reading file…';
+  let data;
+  try {
+    data = await file.arrayBuffer();
+  } catch (err) {
+    uploadStatusEl.textContent = `Couldn't read the file: ${err.message}`;
+    return;
+  }
+
+  uploadStatusEl.textContent = 'Opening reader…';
+  chrome.runtime.sendMessage({ type: 'STORE_FILE', filename: file.name, data }, (response) => {
+    if (chrome.runtime.lastError || !response || !response.fileId) {
+      const reason = (response && response.error && response.error.message) || (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'unknown error';
+      uploadStatusEl.textContent = `Couldn't open reader: ${reason}`;
+      return;
+    }
+    chrome.tabs.create({ url: chrome.runtime.getURL(`reader/index.html?fileId=${response.fileId}`) });
+    window.close(); // this popup's job is done — the reader tab takes over
+  });
+});

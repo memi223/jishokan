@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Reader — Japanese Reading Helper</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    max-width: 720px;
+    margin-inline: auto;
+    font-family: -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN", sans-serif;
+    background: #FAF7F0;
+    color: #1F1B16;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #17140F; color: #EDE6D6; }
+  }
+  #status {
+    position: sticky;
+    top: 0;
+    padding: 8px 0;
+    background: #FAF7F0;
+    font-size: 12.5px;
+    color: #7A7368;
+    border-bottom: 1px solid #E4DCC8;
+    margin-bottom: 20px;
+  }
+  @media (prefers-color-scheme: dark) {
+    #status { background: #17140F; color: #A69C8C; border-color: #332C22; }
+  }
+  .pdf-page {
+    margin-bottom: 28px;
+    padding-bottom: 28px;
+    border-bottom: 1px dashed #E4DCC8;
+  }
+  @media (prefers-color-scheme: dark) { .pdf-page { border-color: #332C22; } }
+  .pdf-page p {
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    font-size: 17px;
+    line-height: 2;
+    /* Japanese wraps fine without justify/hyphen rules English text needs */
+    white-space: pre-wrap;
+  }
+  .page-number {
+    font-size: 11px;
+    color: #7A7368;
+    margin-bottom: 6px;
+  }
+  @media (prefers-color-scheme: dark) { .page-number { color: #A69C8C; } }
+</style>
+</head>
+<body>
+  <div id="status">Loading…</div>
+  <div id="content"></div>
+
+  <!--
+    Same scripts the content script loads, same order, for the exact
+    reason described in the chat: this page IS the extension's own
+    origin, not an injected foreign-page context, so mode.js /
+    overlay.js / selectionDetector.js and friends work completely
+    unchanged here — no content_scripts injection involved at all.
+  -->
+  <script src="../utils/extractKanji.js"></script>
+  <script src="../services/kanji/kanjiIndex.js"></script>
+  <script src="../services/dictionary/jitendexProvider.js"></script>
+  <script src="../services/dictionary/fakeJpJpLookup.js"></script>
+  <script src="../content/mode.js"></script>
+  <script src="../content/overlay.js"></script>
+  <script src="../content/selectionDetector.js"></script>
+
+  <!-- PDF-specific logic only — an ES module, since pdf.min.mjs is one.
+       Isolated to this one page; doesn't affect the no-bundler approach
+       used everywhere else, since native ES modules aren't a bundler. -->
+  <script type="module" src="reader.js"></script>
+</body>
+</html>

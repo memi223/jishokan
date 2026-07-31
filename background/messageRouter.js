@@ -12,6 +12,18 @@
 // that line in the popup is a static note, not a live query. Real
 // asymmetry, not an oversight — see README's "Why JP-EN loads
 // differently" section.
+//
+// STORE_FILE / GET_FILE move an uploaded PDF's raw bytes from the popup
+// (where the file input lives) to the reader tab (a completely separate
+// execution context that can't just hold a reference to the popup's File
+// object — the popup closes the moment chrome.tabs.create() opens the new
+// tab). The ArrayBuffer travels through chrome.runtime's structured-clone
+// messaging directly — no base64 round trip needed, unlike some older
+// messaging APIs that were JSON-only.
+
+function generateFileId() {
+  return `file-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message) return false;
@@ -37,6 +49,29 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         type: 'STATUS_RESPONSE',
         jitendex: { termCount: 0, imported: false },
         error: { code: 'status_failed', message: err.message || String(err) },
+      }));
+    return true;
+  }
+
+  if (message.type === 'STORE_FILE') {
+    const fileId = generateFileId();
+    storeFile(fileId, message.filename, message.data)
+      .then(() => sendResponse({ type: 'FILE_STORED', fileId }))
+      .catch((err) => sendResponse({
+        type: 'FILE_STORED',
+        fileId: null,
+        error: { code: 'store_failed', message: err.message || String(err) },
+      }));
+    return true;
+  }
+
+  if (message.type === 'GET_FILE') {
+    getFile(message.fileId)
+      .then((file) => sendResponse({ type: 'FILE_RESPONSE', file: file || null }))
+      .catch((err) => sendResponse({
+        type: 'FILE_RESPONSE',
+        file: null,
+        error: { code: 'get_file_failed', message: err.message || String(err) },
       }));
     return true;
   }
