@@ -45,11 +45,33 @@ function requestFile(fileId) {
   });
 }
 
-async function renderPdf(arrayBuffer, filename) {
+async function renderPdf(data, filename) {
   document.title = filename;
 
+  // The exact assumption flagged as unverified when this was first built:
+  // that an ArrayBuffer survives popup -> background -> IndexedDB -> reader
+  // through real chrome.runtime messaging the same way it did in an
+  // in-process test mock. It didn't, for at least one real user — this
+  // turns PDF.js's generic internal error into a diagnostic that says
+  // exactly what arrived instead, rather than reproducing that same
+  // opaque failure a second time.
+  console.log('[reader.js] received data:', data, 'constructor:', data?.constructor?.name, 'byteLength:', data?.byteLength);
+
+  let bytes;
+  if (data instanceof Uint8Array) {
+    bytes = data;
+  } else if (data instanceof ArrayBuffer) {
+    bytes = new Uint8Array(data);
+  } else {
+    throw new Error(
+      `Expected the PDF's bytes as an ArrayBuffer, got ${data?.constructor?.name ?? typeof data} instead. ` +
+      `This means the binary data didn't survive the popup \u2192 background \u2192 IndexedDB \u2192 reader hand-off intact ` +
+      `\u2014 check the browser console for the logged value above.`,
+    );
+  }
+
   const loadingTask = pdfjsLib.getDocument({
-    data: arrayBuffer,
+    data: bytes,
     cMapUrl: chrome.runtime.getURL('vendor/pdfjs/cmaps/'),
     cMapPacked: true,
   });
@@ -91,9 +113,7 @@ async function renderPdf(arrayBuffer, filename) {
   }
   try {
     const file = await requestFile(fileId);
-    // file.data crossed a chrome.runtime.sendMessage boundary — structured
-    // clone should preserve it as a real ArrayBuffer. If it doesn't,
-    // pdfjsLib.getDocument() below fails loudly, not silently.
+    console.log('[reader.js] received file record:', file, 'data type:', file.data?.constructor?.name);
     await renderPdf(file.data, file.filename);
   } catch (err) {
     statusEl.textContent = `Couldn't load this PDF: ${err.message}`;

@@ -54,6 +54,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === 'STORE_FILE') {
+    console.log('[messageRouter.js] STORE_FILE received data:', message.data, 'constructor:', message.data?.constructor?.name, 'byteLength:', message.data?.byteLength);
     const fileId = generateFileId();
     storeFile(fileId, message.filename, message.data)
       .then(() => sendResponse({ type: 'FILE_STORED', fileId }))
@@ -67,7 +68,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === 'GET_FILE') {
     getFile(message.fileId)
-      .then((file) => sendResponse({ type: 'FILE_RESPONSE', file: file || null }))
+      .then((file) => {
+        console.log('[messageRouter.js] GET_FILE retrieved from IndexedDB:', file, 'data constructor:', file?.data?.constructor?.name, 'byteLength:', file?.data?.byteLength);
+        sendResponse({ type: 'FILE_RESPONSE', file: file || null });
+      })
       .catch((err) => sendResponse({
         type: 'FILE_RESPONSE',
         file: null,

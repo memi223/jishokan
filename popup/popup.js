@@ -67,6 +67,7 @@ fileInput.addEventListener('change', async () => {
     uploadStatusEl.textContent = `Couldn't read the file: ${err.message}`;
     return;
   }
+  console.log('[popup.js] about to send data:', data, 'constructor:', data?.constructor?.name, 'byteLength:', data?.byteLength);
 
   uploadStatusEl.textContent = 'Opening reader…';
   chrome.runtime.sendMessage({ type: 'STORE_FILE', filename: file.name, data }, (response) => {
