@@ -16,6 +16,15 @@
   }
   @media (prefers-color-scheme: dark) {
     body { background: #17140F; color: #EDE6D6; }
+    #status { background: #17140F; color: #A69C8C; border-color: #332C22; }
+  }
+  /* Explicit theme choice wins over system dark mode: an attribute
+     selector on body has higher specificity than the plain `body`
+     selector inside the dark-mode media query above, so this overrides
+     it regardless of source order or OS setting — no !important needed. */
+  body[data-theme="whitesmoke"] {
+    background: whitesmoke;
+    color: #2B2B2B;
   }
   #status {
     position: sticky;
@@ -26,16 +35,42 @@
     color: #7A7368;
     border-bottom: 1px solid #E4DCC8;
     margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
+  body[data-theme="whitesmoke"] #status {
+    background: whitesmoke;
+    color: #6B6B6B;
+    border-color: #DCDCDC;
+  }
+  #status-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #theme-toggle { flex-shrink: 0; display: flex; gap: 4px; }
+  #theme-toggle button {
+    font-family: inherit;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    border: 1px solid #E4DCC8;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+  #theme-toggle button.active { border-color: #B23A2E; color: #B23A2E; }
   @media (prefers-color-scheme: dark) {
-    #status { background: #17140F; color: #A69C8C; border-color: #332C22; }
+    #theme-toggle button { border-color: #332C22; }
+    #theme-toggle button.active { border-color: #D1584A; color: #D1584A; }
   }
+  body[data-theme="whitesmoke"] #theme-toggle button { border-color: #DCDCDC; }
+  body[data-theme="whitesmoke"] #theme-toggle button.active { border-color: #B23A2E; color: #B23A2E; }
   .pdf-page {
     margin-bottom: 28px;
     padding-bottom: 28px;
     border-bottom: 1px dashed #E4DCC8;
   }
   @media (prefers-color-scheme: dark) { .pdf-page { border-color: #332C22; } }
+  body[data-theme="whitesmoke"] .pdf-page { border-color: #DCDCDC; }
   .pdf-page p {
     font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     font-size: 17px;
@@ -49,11 +84,55 @@
     margin-bottom: 6px;
   }
   @media (prefers-color-scheme: dark) { .page-number { color: #A69C8C; } }
+  body[data-theme="whitesmoke"] .page-number { color: #8A8A8A; }
 </style>
 </head>
 <body>
-  <div id="status">Loading…</div>
+  <div id="status">
+    <span id="status-text">Loading…</span>
+    <span id="theme-toggle">
+      <button type="button" data-theme="default">Default</button>
+      <button type="button" data-theme="whitesmoke">Whitesmoke</button>
+    </span>
+  </div>
   <div id="content"></div>
+
+  <!--
+    Theme toggle: a plain classic script, deliberately separate from
+    reader.js's PDF-handling module — theme switching shouldn't depend
+    on whether a PDF loaded successfully, or on module semantics at all.
+    Persisted via chrome.storage.local, same pattern content/mode.js
+    already uses, so the choice survives closing and reopening this tab.
+  -->
+  <script>
+    (function () {
+      var THEME_KEY = 'readerTheme';
+      var buttons = document.querySelectorAll('#theme-toggle button');
+
+      function applyTheme(theme) {
+        if (theme === 'whitesmoke') {
+          document.body.setAttribute('data-theme', 'whitesmoke');
+        } else {
+          document.body.removeAttribute('data-theme');
+        }
+        buttons.forEach(function (btn) {
+          btn.classList.toggle('active', btn.dataset.theme === theme);
+        });
+      }
+
+      chrome.storage.local.get(THEME_KEY, function (result) {
+        applyTheme(result[THEME_KEY] || 'default');
+      });
+
+      buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var theme = btn.dataset.theme;
+          applyTheme(theme);
+          chrome.storage.local.set((function () { var o = {}; o[THEME_KEY] = theme; return o; })());
+        });
+      });
+    })();
+  </script>
 
   <!--
     Same scripts the content script loads, same order, for the exact
