@@ -1,26 +1,8 @@
-# Build artifacts (once a bundler is introduced)
-dist/
-build/
-*.crx
-*.pem
-
-# Dependencies (once package.json exists)
-node_modules/
-
-# OS/editor cruft
-.DS_Store
-Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 
-# Raw extracted intermediate JSON 
 dict/kanjidic/kanjidic2-en-*.json
-dict/jitendex/jitendex-normalized.json
-# Large local dictionary sources not yet checked in (e.g. Jitendex zip
 
 dict/jitendex/*.zip
 
-# Jitendex's normalized output (~65MB) — regeneratable via
-# scripts/normalize-jitendex.py from the source zip, not worth bloating
-# git history or every future delivered copy of this repo with it
-dict/jitendex/normalized.json
+dict/jitendex/jitendex-normalized.json
