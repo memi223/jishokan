@@ -6,4 +6,4 @@
 // — db.js's functions are what importDictionaryData.js and
 // messageRouter.js call directly, no import/export syntax needed.
 
-importScripts('db.js', 'importDictionaryData.js', 'messageRouter.js');
+importScripts('../utils/base64.js', 'db.js', 'importDictionaryData.js', 'messageRouter.js');

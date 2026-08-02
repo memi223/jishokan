@@ -51,6 +51,11 @@ chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (response) => {
 // no way to hand a File object to a tab that doesn't exist yet, and this
 // popup closes the instant the new tab opens anyway. The reader tab asks
 // the background worker for the same file back by the id this returns.
+//
+// Sent as base64, not the raw ArrayBuffer: Chrome's extension messaging
+// serializes with JSON, not structured clone (confirmed against Chrome's
+// own docs — see utils/base64.js), and JSON.stringify(anArrayBuffer) is
+// silently "{}". A real user hit exactly that before this was added.
 
 const fileInput = document.getElementById('file-input');
 const uploadStatusEl = document.getElementById('upload-status');
@@ -62,12 +67,13 @@ fileInput.addEventListener('change', async () => {
   uploadStatusEl.textContent = 'Reading file…';
   let data;
   try {
-    data = await file.arrayBuffer();
+    const arrayBuffer = await file.arrayBuffer();
+    data = arrayBufferToBase64(arrayBuffer);
   } catch (err) {
     uploadStatusEl.textContent = `Couldn't read the file: ${err.message}`;
     return;
   }
-  console.log('[popup.js] about to send data:', data, 'constructor:', data?.constructor?.name, 'byteLength:', data?.byteLength);
+  console.log('[popup.js] about to send data as base64, length:', data?.length);
 
   uploadStatusEl.textContent = 'Opening reader…';
   chrome.runtime.sendMessage({ type: 'STORE_FILE', filename: file.name, data }, (response) => {

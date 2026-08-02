@@ -45,30 +45,15 @@ function requestFile(fileId) {
   });
 }
 
-async function renderPdf(data, filename) {
+async function renderPdf(base64Data, filename) {
   document.title = filename;
 
-  // The exact assumption flagged as unverified when this was first built:
-  // that an ArrayBuffer survives popup -> background -> IndexedDB -> reader
-  // through real chrome.runtime messaging the same way it did in an
-  // in-process test mock. It didn't, for at least one real user — this
-  // turns PDF.js's generic internal error into a diagnostic that says
-  // exactly what arrived instead, rather than reproducing that same
-  // opaque failure a second time.
-  console.log('[reader.js] received data:', data, 'constructor:', data?.constructor?.name, 'byteLength:', data?.byteLength);
-
-  let bytes;
-  if (data instanceof Uint8Array) {
-    bytes = data;
-  } else if (data instanceof ArrayBuffer) {
-    bytes = new Uint8Array(data);
-  } else {
-    throw new Error(
-      `Expected the PDF's bytes as an ArrayBuffer, got ${data?.constructor?.name ?? typeof data} instead. ` +
-      `This means the binary data didn't survive the popup \u2192 background \u2192 IndexedDB \u2192 reader hand-off intact ` +
-      `\u2014 check the browser console for the logged value above.`,
-    );
-  }
+  // base64, not a raw ArrayBuffer — see utils/base64.js for why: Chrome's
+  // extension messaging JSON-serializes, and a raw ArrayBuffer silently
+  // becomes "{}" crossing chrome.runtime.sendMessage. Confirmed against
+  // Chrome's own docs after a real user hit exactly that failure.
+  const bytes = new Uint8Array(base64ToArrayBuffer(base64Data));
+  console.log('[reader.js] decoded bytes, length:', bytes.length);
 
   const loadingTask = pdfjsLib.getDocument({
     data: bytes,
@@ -113,7 +98,7 @@ async function renderPdf(data, filename) {
   }
   try {
     const file = await requestFile(fileId);
-    console.log('[reader.js] received file record:', file, 'data type:', file.data?.constructor?.name);
+    console.log('[reader.js] received file record, data type:', typeof file.data, 'length:', file.data?.length);
     await renderPdf(file.data, file.filename);
   } catch (err) {
     statusEl.textContent = `Couldn't load this PDF: ${err.message}`;
