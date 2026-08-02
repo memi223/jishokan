@@ -22,8 +22,6 @@ def normalize(raw):
                 elif r["type"] == "ja_kun":
                     kunyomi.append(r["value"])
                 elif r["type"] == "vietnam":
-                    # KANJIDIC2 already includes Hán-Việt readings —
-                    # a nice freebie given the Vietnamese-facing UI.
                     han_viet.append(r["value"])
             for m in group.get("meanings", []):
                 if m["lang"] == "en":
