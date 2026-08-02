@@ -37,3 +37,5 @@ they accumulate.
   seam where a real message to the background worker replaces the
   `setTimeout`, same pattern JP-EN just went through.
 - Deinflection (食べた won't resolve to 食べる in JP-EN/JP-JP yet).
+
+- There is still some missing some spacing and line break in pdf mode.
