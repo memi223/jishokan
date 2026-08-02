@@ -8,7 +8,7 @@
 // background context reading its own bundled files) — and writes it into
 // IndexedDB via db.js.
 
-const JITENDEX_DATA_URL = 'dict/jitendex/normalized.json';
+const JITENDEX_DATA_URL = 'dict/jitendex/jitendex-normalized.json';
 
 // Bumped by hand whenever normalize-jitendex.py's output shape changes,
 // so a stale IndexedDB from an older extension version gets re-imported

@@ -27,7 +27,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["dict/kanjidic/normalized.json"],
+      "resources": ["dict/kanjidic/jitendex-normalized.json"],
       "matches": ["<all_urls>"]
     }
   ]
