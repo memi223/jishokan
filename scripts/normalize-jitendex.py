@@ -1,17 +1,6 @@
 """
 scripts/normalize-jitendex.py
 
-Offline build step, same role as normalize-kanjidic.py. Takes the raw
-Yomitan-format Jitendex export (term_bank_*.json + index.json) and
-reduces each entry to our DictionaryEntry shape.
-
-The one thing this has to do that normalize-kanjidic.py didn't: Jitendex's
-glossary is Yomitan's "structured-content" format — a nested tree of
-{tag, data, content} nodes (div/span/ul/li/ruby/a...), not a plain string.
-walk_structured_content() below extracts sense groups (part-of-speech +
-glossary text) and the first example sentence pair it finds, dropping
-everything else (furigana <ruby> markup, attribution links, styling).
-
 Usage:
     python3 scripts/normalize-jitendex.py <dir-of-extracted-term_bank-files> dict/jitendex/normalized.json
 """
