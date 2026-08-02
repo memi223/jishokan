@@ -1,20 +1,8 @@
 """
 scripts/normalize-kanjidic.py
 
-Offline build step (not part of the extension runtime — see the "Local
-Dictionary Data Pipeline" section of architecture v2). Takes the raw
-kanjidic2-en JSON from jmdict-simplified and reduces it to exactly the
-shape our KanjiInfo model needs, dropping everything else (cross-references
-to two dozen paper dictionaries we'll never use, codepoints, radicals, etc).
-
 Usage:
     python3 scripts/normalize-kanjidic.py dict/kanjidic/kanjidic2-en-3.6.2.json dict/kanjidic/normalized.json
-
-Note: KANJIDIC2's own jlptLevel field uses the OLD 4-level JLPT scale from
-before the 2010 revision and hasn't been updated since — it's dropped
-entirely here rather than kept under any name. KanjiInfo has no jlptLevel
-field; JLPT level lives only on the word-level DictionaryEntry, sourced
-from the word dictionary (Jitendex/JMdict), not from kanji data.
 """
 
 import json
