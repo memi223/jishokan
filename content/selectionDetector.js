@@ -1,14 +1,3 @@
-// content/selectionDetector.js
-//
-// Entry point — wires together everything loaded before it (see
-// manifest.json's content_scripts order: utils/extractKanji.js,
-// services/kanji/kanjiIndex.js, services/dictionary/jitendexProvider.js,
-// services/dictionary/fakeJpJpLookup.js, content/mode.js,
-// content/overlay.js, then this file last).
-//
-// mouseup is enough for a first pass: it fires once, right when the
-// user releases after dragging a selection.
-
 let lastText = '';
 
 function onMouseUp() {
