@@ -69,13 +69,23 @@ system already knows how to handle.
 
 How the file actually gets from the popup (where you pick it) to the
 reader tab (a completely separate page that doesn't exist yet at the
-moment you pick the file): the popup reads it as an `ArrayBuffer`, sends
-it to the background worker (`STORE_FILE`), which puts it in IndexedDB
-and hands back an id; the popup opens `reader/index.html?fileId=<id>`,
-and the reader page asks the background worker for that same file back
-(`GET_FILE`). Verified end-to-end with real binary data before commit —
-store, retrieve, byte-for-byte match, unknown ids handled cleanly, two
-uploads never colliding.
+moment you pick the file): the popup reads it as an `ArrayBuffer`,
+base64-encodes it (`utils/base64.js`), and sends it to the background
+worker (`STORE_FILE`), which decodes it back to a real `ArrayBuffer` and
+puts it in IndexedDB, handing back an id; the popup opens
+`reader/index.html?fileId=<id>`, and the reader page asks the background
+worker for that same file back (`GET_FILE`, base64-encoded again for the
+return trip). The base64 step isn't decoration — **a real user hit this
+exactly**: Chrome's extension messaging serializes with JSON, not
+structured clone like other browsers
+(confirmed against Chrome's own current docs), and `JSON.stringify(anArrayBuffer)`
+is silently `"{}"`. First version of this feature sent the raw
+`ArrayBuffer` and broke exactly that way in practice. Fixed and
+re-verified through a test that actually simulates Chrome's real
+JSON-round-trip behavior (my first version of this test didn't, which is
+exactly why it didn't catch the bug before a real person hit it) —
+reproduces the original failure on a raw `ArrayBuffer`, then confirms the
+base64 fix survives the identical boundary byte-for-byte.
 
 Text extraction is [PDF.js](https://github.com/mozilla/pdf.js)
 (Apache-2.0), vendored directly in `vendor/pdfjs/` — not from npm/a CDN,
@@ -83,17 +93,13 @@ just the three pieces text extraction actually needs (~3.3MB total, see
 `vendor/pdfjs/README.md`): the library, its worker, and the CJK character
 maps real Japanese PDFs often need to decode text correctly at all.
 
-**What I could verify from here, and what I couldn't:** the storage
-round-trip is real and tested. Three things aren't, and need an actual
-browser to confirm: whether an `ArrayBuffer` survives the real
-`chrome.runtime.sendMessage` structured-clone boundary the same way it
-did in my in-process test mock; whether the PDF.js worker actually loads
+**What's still unverified, honestly:** whether the PDF.js worker loads
 via `chrome.runtime.getURL()` without needing a `web_accessible_resources`
-entry (expected, based on the same same-origin reasoning already
-confirmed for the background worker's own resource access — just not
-yet observed for a `Worker` specifically); and, of course, whether real
-Japanese PDF text comes out clean. First real test: load the extension
-and actually try it.
+entry (expected, same same-origin reasoning already confirmed for the
+background worker's own resource access — just not yet observed for a
+`Worker` specifically), and whether real Japanese PDF text extracts
+cleanly once the data actually reaches PDF.js now. Next real test: try
+the same PDF again.
 
 **Known gap**: no separator between text items within a page, since
 Japanese doesn't use spaces between words — but that also means no line
