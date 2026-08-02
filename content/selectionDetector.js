@@ -14,13 +14,6 @@ function onMouseUp() {
 
   const range = selection.getRangeAt(0);
 
-  // "Deep search": a selection made INSIDE our own card (e.g. dragging
-  // across a word in a JP-JP definition) bubbles up to this same
-  // document-level listener via the shadow DOM's normal event flow — no
-  // special wiring needed for that part. What DOES need a check: don't
-  // reposition the card off a rect that's already inside itself, or it
-  // visually "jumps" mid-chain instead of staying anchored while you
-  // drill in.
   const selectionInsideCard = cardEl && cardEl.contains(range.commonAncestorContainer);
 
   ensureMounted();
