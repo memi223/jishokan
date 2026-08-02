@@ -1,25 +1,5 @@
-// reader/reader.js
-//
-// ES module (see index.html) — imports PDF.js directly, unlike every
-// other script in this project. Everything below this file's own logic
-// (mode switching, lookups, the overlay card) is untouched; it's already
-// loaded as plain scripts by index.html before this runs, and just works
-// on whatever text ends up in #content, the same as it works on any
-// other page's DOM.
-
 import * as pdfjsLib from '../vendor/pdfjs/pdf.min.mjs';
 
-// chrome.runtime.getURL() always produces a fully-qualified
-// chrome-extension://<id>/... URL, which is what sidesteps the relative-
-// path pitfalls that account for most "PDF.js worker won't load" issues
-// people hit in other setups (wrong bundler-relative paths, CDN URLs
-// blocked by CSP). Since this runs in an extension page's own origin —
-// same bucket as the background worker, not a content script — this
-// shouldn't need a web_accessible_resources entry either, per the same
-// reasoning verified for background/importDictionaryData.js. Flagging
-// it as expected-but-not-yet-observed-in-a-real-browser, consistent with
-// how every other same-origin-access claim in this project has been
-// noted until actually confirmed by loading the extension for real.
 pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('vendor/pdfjs/pdf.worker.min.mjs');
 
 const statusEl = document.getElementById('status');
