@@ -28,12 +28,6 @@ function onMouseUp() {
       renderKanjiEmpty(text);
       return;
     }
-    // A fresh manual selection isn't tied to whatever word (if any) was
-    // last shown — drop that context so no stale "back" button or
-    // sibling row from an unrelated word shows up here. A selection made
-    // inside the card itself (browsing sibling chips' own text, say)
-    // still counts as "fresh" for this purpose — only a chip click sets
-    // this, per overlay.js.
     kanjiChipContext = null;
     renderLoading(text);
     kanjiLookup(characters).then(
@@ -74,9 +68,7 @@ document.addEventListener('keydown', (e) => {
     lastText = '';
     return;
   }
-  // Alt+K cycles JP-JP -> JP-EN -> Kanji -> JP-JP. Content-script-only
-  // stand-in for the chrome.commands + background badge planned in
-  // architecture v4 §1.
+
   if (e.altKey && e.key.toLowerCase() === 'k') {
     cycleMode();
   }
