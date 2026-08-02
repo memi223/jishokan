@@ -1,22 +1,3 @@
-// content/mode.js
-//
-// Three modes: JP-JP (monolingual, "deep search" is the point of this
-// one), JP-EN (Jitendex), and Kanji (KANJIDIC).
-//
-// Mode is now shared state, backed by chrome.storage.local — not just a
-// per-tab variable. This matters now that the toolbar popup exists:
-// clicking a mode button there needs to actually reach whichever tab
-// you're looking at, and switching mode in one tab shouldn't silently
-// have no effect anywhere else. setMode() writes to storage; the
-// chrome.storage.onChanged listener at the bottom is what makes every
-// open tab (and the popup, if it's open) pick up a change made anywhere
-// else — including the popup's own writes.
-//
-// modePillEl is declared here but created in overlay.js's ensureMounted()
-// (it lives in the Shadow DOM overlay.js owns) — overlay.js assigns to
-// this same shared binding rather than declaring its own, since both
-// files need to agree on one pill element.
-
 const MODES = ['jp-jp', 'jp-en', 'kanji'];
 const MODE_LABELS = {
   'jp-jp': '日 JP-JP mode',
