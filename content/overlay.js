@@ -1,11 +1,3 @@
-// content/overlay.js
-//
-// Shadow DOM mount, isolated from the host page's CSS, plus every render
-// function for both modes. Depends on extractKanji (utils/extractKanji.js),
-// currentMode/setMode (content/mode.js), and kanjiLookup
-// (services/kanji/kanjiIndex.js) — must load after all three; see
-// manifest.json's content_scripts order.
-
 const STYLES = `
   :host { all: initial; }
   .card {
