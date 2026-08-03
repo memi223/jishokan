@@ -4,7 +4,7 @@ function onMouseUp() {
   const selection = window.getSelection();
   const text = selection ? selection.toString().trim() : '';
 
-  if (!text) {
+  if (!text || text.length > 16 && currentMode !== 'kanji' || text.length > 128) { // 16 is enough for a japanese word
     hideCard();
     lastText = '';
     return;
