@@ -1,15 +1,5 @@
 ## Try it
-
-1. `chrome://extensions` → Developer mode → **Load unpacked** → this folder
-2. Default mode is **JP-EN**. Select `食べる`, `学生`, `大きい`, `猫`, or
-   any other real word — this is genuine Jitendex data now, not a demo
-   set. Select something not in any dictionary to see the soft "no
-   entry" state (distinct from an actual error).
-3. Use Alt + K to cycle 3 three modes (still missing one).
-5. In either JP-EN or JP-JP mode, the character chip(s) under a word are
-   clickable — tapping one jumps into Kanji mode for that character, with
-   a back button to return to whichever word mode you came from.
-6. Click outside the card, or press Escape, to dismiss it.
+`chrome://extensions` → Developer mode → **Load unpacked** → this folder (git clone)
 
 ## Dict regeneration: see in dict/README.md
 
