@@ -16,7 +16,6 @@
   }
   @media (prefers-color-scheme: dark) {
     body { background: #17140F; color: #EDE6D6; }
-    #status { background: #17140F; color: #A69C8C; border-color: #332C22; }
   }
   /* Explicit theme choice wins over system dark mode: an attribute
      selector on body has higher specificity than the plain `body`
@@ -39,6 +38,9 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    #status { background: #17140F; color: #A69C8C; border-color: #332C22; }
   }
   body[data-theme="whitesmoke"] #status {
     background: whitesmoke;
@@ -91,7 +93,7 @@
   <div id="status">
     <span id="status-text">Loading…</span>
     <span id="theme-toggle">
-      <button type="button" data-theme="default">Default</button>
+      <button type="button" data-theme="paper">Paper</button>
       <button type="button" data-theme="whitesmoke">Whitesmoke</button>
     </span>
   </div>
@@ -113,7 +115,7 @@
         if (theme === 'whitesmoke') {
           document.body.setAttribute('data-theme', 'whitesmoke');
         } else {
-          document.body.removeAttribute('data-theme');
+          document.body.removeAttribute('data-theme'); // 'paper' — the default, system-dark-mode-aware look
         }
         buttons.forEach(function (btn) {
           btn.classList.toggle('active', btn.dataset.theme === theme);
@@ -121,7 +123,7 @@
       }
 
       chrome.storage.local.get(THEME_KEY, function (result) {
-        applyTheme(result[THEME_KEY] || 'default');
+        applyTheme(result[THEME_KEY] || 'paper');
       });
 
       buttons.forEach(function (btn) {
